@@ -1,5 +1,6 @@
 require "sqlite3"
 require "fileutils"
+require_relative "utils"
 
 
 

@@ -4,6 +4,19 @@ module Utils
 	def self.slugify(s)
 		s.to_url
 	end
+	
+	def self.unique_slug(directory, slug)
+		slug = "#{slug}"
+		slug_new = "#{slug}"
+		counter = 2
+
+		while File.exist?(directory.join(slug_new+".md"))
+			slug_new = "#{slug}-#{counter}"
+			counter += 1
+		end
+
+		slug_new
+	end
 end
 
 

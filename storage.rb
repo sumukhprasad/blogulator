@@ -133,6 +133,65 @@ class Storage
 		)
 	end
 	
+	def get_posts(options = {})
+		limit = options.fetch(:limit, 20)
+		offset = options.fetch(:offset, 0)
+
+		limit = Integer(limit)
+		offset = Integer(offset)
+
+		rows = @db.execute(
+			<<~SQL,
+				SELECT id, slug, created_at, updated_at
+				FROM posts
+				ORDER BY created_at DESC
+				LIMIT ? OFFSET ?
+			SQL
+			[limit,
+			offset]
+		)
+
+		rows.filter_map do |row|
+			id, slug, created_at_string, updated_at_string = row
+
+			created_at = Time.parse(created_at_string)
+			updated_at = Time.parse(updated_at_string)
+
+			path = @posts
+				.join(created_at.strftime("%Y"))
+				.join(created_at.strftime("%m"))
+				.join(created_at.strftime("%d"))
+				.join("#{slug}.md")
+
+			next unless File.file?(path)
+
+			content = File.read(path)
+
+			unless content.start_with?("---")
+				warn "Skipping post #{id}: invalid Jekyll front matter"
+				next
+			end
+
+			_, front_matter, body = content.split(/^---\s*$\n/, 3)
+
+			metadata = YAML.safe_load(
+				front_matter,
+				permitted_classes: [Time]
+			) || {}
+
+			Post.new(
+				id: id,
+				title: metadata["title"],
+				body: body,
+				slug: slug,
+				date: metadata["date"],
+				created_at: created_at,
+				updated_at: updated_at,
+				path: path
+			)
+		end
+	end
+	
 	def delete_post(id)
 		puts "Deleting post #{id}..."
 
@@ -264,6 +323,10 @@ if __FILE__ == $0
 	post = blogulator_storage.get_post(SecureRandom.uuid)
 	puts post.inspect
 	
+	puts "> Testing post retrieval, multiple..."
+	posts = blogulator_storage.get_posts()
+	puts posts.inspect
+	
 	puts "> Done."
 	puts "======================="
 
@@ -329,4 +392,5 @@ if __FILE__ == $0
 	
 	puts "> Done."
 	puts "======================="
+	
 end

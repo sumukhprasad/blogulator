@@ -1,5 +1,8 @@
+require 'nokogiri'
+
+
 class Post
-	attr_accessor :id, :title, :body, :slug, :date, :created_at, :updated_at, :path
+	attr_accessor :id, :title, :body, :slug, :date, :created_at, :updated_at, :path, :metadata
 
 	def initialize(
 		id: nil,
@@ -9,7 +12,8 @@ class Post
 		date: nil,
 		created_at: nil,
 		updated_at: nil,
-		path: nil
+		path: nil,
+		metadata: {}
 	)
 		@id = id
 		@title = title
@@ -19,6 +23,7 @@ class Post
 		@created_at = created_at
 		@updated_at = updated_at
 		@path = path
+		@metadata = metadata
 	end
 
 	def persisted?
@@ -43,7 +48,7 @@ class Post
 			title: "#{title}"
 			date: #{date.iso8601}
 			---
-          	
+						
 			#{body}
 		MD
 	end

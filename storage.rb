@@ -57,7 +57,7 @@ class Storage
 		
 		puts "Done!"
 		
-		post.id
+		post
 	end
 	
 	def update_post(id, updated_post)
@@ -65,10 +65,12 @@ class Storage
 
 		post = get_post(id)
 		return nil unless post
+		
+		puts updated_post.inspect
 
 		post.title = updated_post.title if updated_post.title
 		post.body = updated_post.body if updated_post.body
-		post.updated_at = updated_post.updated_at || Time.now
+		post.updated_at = updated_post.created_at || Time.now
 
 		directory = @posts.join(post.filepath)
 		filepath = directory.join(post.slug + ".md")
@@ -78,7 +80,7 @@ class Storage
 		@db.execute(
 			<<~SQL,
 				UPDATE posts
-				SET slug = ?, updated_at = ?
+				SET updated_at = ?
 				WHERE id = ?
 			SQL
 			[post.updated_at.iso8601,
@@ -87,7 +89,7 @@ class Storage
 
 		puts "Done!"
 
-		id
+		post
 	end
 	
 	def get_post(id)
@@ -129,7 +131,8 @@ class Storage
 			date: metadata["date"],
 			created_at: created_at,
 			updated_at: updated_at,
-			path: path
+			path: path,
+			metadata: metadata
 		)
 	end
 	

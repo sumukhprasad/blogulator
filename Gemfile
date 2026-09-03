@@ -7,3 +7,4 @@ gem "builder"
 gem "sqlite3"
 gem 'fileutils'
 gem 'stringex'
+gem 'nokogiri'

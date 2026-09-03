@@ -3,6 +3,7 @@ require "time"
 require 'securerandom'
 require_relative "process_xml"
 require_relative "posts"
+require_relative "media"
 require_relative "storage"
 require_relative "utils"
 
@@ -33,6 +34,8 @@ def dump_request
 
 	if body.empty?
 		puts "(empty)"
+	elsif request.env["CONTENT_TYPE"].include? "image"
+		puts "(image)"
 	else
 		puts body
 	end
@@ -41,6 +44,25 @@ def dump_request
 
 	request.body.rewind
 end
+
+
+def request_filename
+	content_disposition = request.env["HTTP_CONTENT_DISPOSITION"]
+	
+	http_slug = request.env["HTTP_SLUG"]
+	return http_slug if http_slug
+	
+	return nil unless content_disposition
+
+	match = content_disposition.match(
+		/filename="([^"]+)"/
+	)
+
+	match && match[1]
+end
+
+
+
 
 # service document
 get "/atompub/service" do
@@ -56,9 +78,14 @@ get "/atompub/service" do
 			<workspace>
 				<atom:title>Blogulator! Demo</atom:title>
 
-				<collection href="http://localhost:4567/atompub/posts">
+				<collection href="#{request.base_url}/atompub/posts">
 					<atom:title>Posts</atom:title>
 					<accept>application/atom+xml;type=entry</accept>
+				</collection>
+
+				<collection href="#{request.base_url}/atompub/media">
+					<atom:title>Media</atom:title>
+					<accept>*/*</accept>
 				</collection>
 			</workspace>
 		</service>
@@ -209,6 +236,47 @@ end
 
 
 
+# Media
+
+# create an entry
+post "/atompub/media" do
+	no_print_content = true
+	dump_request
+
+	filename = request_filename || "upload"
+	content_type = request.media_type || "application/octet-stream"
+	data = request.body.read
+
+	media = blogulator_storage.create_media(
+		filename: filename,
+		content_type: content_type,
+		data: data
+	)
+
+	headers(
+		"Location" => "#{request.base_url}/atompub/media/#{media.id}"
+	)
+
+	content_type "application/atom+xml;type=entry"
+	status 201
+
+	media_to_atom(media, request)
+end
+
+get "/atompub/media/:id" do
+	dump_request
+
+	media = blogulator_storage.get_media(params[:id])
+	halt 404 unless media
+
+	content_type media.content_type
+	headers(
+		"Content-Length" => media.size.to_s,
+		"Last-Modified" => media.updated_at.httpdate
+	)
+
+	blogulator_storage.get_media_content(media.id)
+end
 
 
 

@@ -95,3 +95,47 @@ def post_to_atom(post, request)
 
 	builder.to_xml
 end
+
+
+
+def media_to_atom(media, request)
+	media_url = "#{request.base_url}/atompub/media/#{media.id}"
+	edit_url = media_url
+	public_url = "#{request.base_url}/assets/#{media.filename}"
+
+	Nokogiri::XML::Builder.new(
+		encoding: "UTF-8"
+	) do |xml|
+
+		xml.entry(
+			"xmlns" => "http://www.w3.org/2005/Atom"
+		) do
+			xml.id media_url
+			xml.title media.filename
+			xml.updated media.updated_at.utc.iso8601
+
+			xml.published media.created_at.utc.iso8601
+
+			xml.link(
+				"rel" => "edit",
+				"href" => edit_url
+			)
+
+			xml.link(
+				"rel" => "edit-media",
+				"href" => edit_url,
+				"type" => media.content_type
+			)
+
+			xml.link(
+				"rel" => "alternate",
+				"href" => public_url
+			)
+
+			xml.content(
+				"type" => media.content_type,
+				"src" => media_url
+			)
+		end
+	end.to_xml
+end

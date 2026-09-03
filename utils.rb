@@ -17,6 +17,15 @@ module Utils
 
 		slug_new
 	end
+	
+	
+	def self.sanitize_filename(filename)
+	  	filename.strip.tap do |name|
+	  		name.gsub!(/^.*(\\|\/)/, '')
+       	 	
+	  		name.gsub!(/[^0-9A-Za-z.\-]/, '_')
+	  	end
+	end
 end
 
 

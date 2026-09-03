@@ -15,12 +15,22 @@ class Storage
 		@posts = @root.join(posts_path)
 		@assets = @root.join(assets_path)
 		
-		@db = SQLite3::Database.new "blogulator.db"
+		@db = SQLite3::Database.new @root.join("blogulator.db").to_s
 		create_db_if_not_available
 		
 		FileUtils.mkdir_p(@posts)
 		FileUtils.mkdir_p(@assets)
 	end
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	# Posts
@@ -223,14 +233,135 @@ class Storage
 	end
 	
 	
+	
+	
+	
+	
+	
+	
+	
+	
+	# Media
+	def create_media(filename:, content_type:, data:)
+	    id = SecureRandom.uuid
+	    now = Time.now
+
+	    original_filename = filename
+	    filename = Utils.sanitize_filename(filename)
+
+	    directory = @assets
+				.join(now.strftime("%Y"))
+				.join(now.strftime("%m"))
+				.join(now.strftime("%d"))
+
+		FileUtils.mkdir_p(directory)
+
+	    path = directory.join(filename)
+
+	    File.binwrite(path, data)
+
+	    @db.execute(
+	        <<~SQL,
+	            INSERT INTO media (
+	                id,
+	                filename,
+	                original_filename,
+	                content_type,
+	                size,
+	                created_at,
+	                updated_at
+	            )
+	            VALUES (?, ?, ?, ?, ?, ?, ?)
+	        SQL
+	        [
+	            id,
+	            original_filename,
+	            filename,
+	            content_type,
+	            data.bytesize,
+	            now.iso8601,
+	            now.iso8601
+	        ]
+	    )
+
+	    Media.new(
+	        id: id,
+	        filename: filename,
+	        original_filename: filename,
+	        content_type: content_type,
+	        size: data.bytesize,
+	        created_at: now,
+	        updated_at: now,
+	        path: path
+	    )
+	end
+	
+	def get_media(id)
+	    row = @db.get_first_row(
+	        <<~SQL,
+	            SELECT
+	                id,
+	                filename,
+	                original_filename,
+	                content_type,
+	                size,
+	                created_at,
+	                updated_at
+	            FROM media
+	            WHERE id = ?
+	        SQL
+	        [id]
+	    )
+
+	    return nil unless row
+
+	    id,
+	    filename,
+	    original_filename,
+	    content_type,
+	    size,
+	    created_at,
+	    updated_at = row
+
+	    created_at = Time.parse(created_at)
+
+	    path = @assets
+				.join(created_at.strftime("%Y"))
+				.join(created_at.strftime("%m"))
+				.join(created_at.strftime("%d"))
+				.join(filename)
+
+	    return nil unless File.file?(path)
+
+	    Media.new(
+	        id: id,
+	        filename: filename,
+	        original_filename: original_filename,
+	        content_type: content_type,
+	        size: size,
+	        created_at: created_at,
+	        updated_at: created_at,
+	        path: path
+	    )
+	end
+	
+	def get_media_content(id)
+	    media = get_media(id)
+	    return nil unless media
+
+	    File.binread(media.path)
+	end
+
+	
+	# Helpers
 	private
 	def create_db_if_not_available
-		puts "Checking if table exists..."
-		table = @db.execute <<-SQL
+		puts "Checking if posts table exists..."
+		posts_table = @db.execute <<-SQL
 			SELECT name FROM sqlite_master WHERE type='table' AND name='posts';
 		SQL
 		
-		if table==[]
+		if posts_table==[]
 			puts "Table does not exist. Creating..."
 			@db.execute <<-SQL
 			CREATE TABLE IF NOT EXISTS posts (
@@ -244,6 +375,33 @@ class Storage
 		else
 			puts "Table already exixts!"
 		end
+		
+		puts "Checking if media table exists..."
+		media_table = @db.execute <<-SQL
+			SELECT name FROM sqlite_master WHERE type='table' AND name='media';
+		SQL
+		
+		if media_table==[]
+			puts "Table does not exist. Creating..."
+			@db.execute <<-SQL
+			CREATE TABLE IF NOT EXISTS media (
+			    id TEXT PRIMARY KEY,
+			    filename TEXT NOT NULL,
+			    original_filename TEXT,
+			    content_type TEXT NOT NULL,
+			    size INTEGER NOT NULL,
+			    created_at TEXT NOT NULL,
+			    updated_at TEXT NOT NULL
+			);
+			SQL
+			puts "Table created!"
+		else
+			puts "Table already exixts!"
+		end
+		
+		
+		
+		
 		puts "Database ready!"
 		true
 	end

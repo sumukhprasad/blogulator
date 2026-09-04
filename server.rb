@@ -1,6 +1,7 @@
 require "sinatra"
 require "time"
 require 'securerandom'
+require 'yaml'
 require_relative "process_xml"
 require_relative "posts"
 require_relative "media"
@@ -11,6 +12,9 @@ require_relative "utils"
 blogulator_storage = Storage.new(".", "assets", "posts")
 set :bind, "0.0.0.0"
 set :port, 4567
+
+
+blogulator_config = YAML.load_file('blogulator.yml')
 
 # logging
 def dump_request
@@ -76,7 +80,7 @@ get "/atompub/service" do
 		<service xmlns="http://www.w3.org/2007/app"
 						 xmlns:atom="http://www.w3.org/2005/Atom">
 			<workspace>
-				<atom:title>Blogulator! Demo</atom:title>
+				<atom:title>#{blogulator_config["blog_title"] || "No title in blogulator.yml."}</atom:title>
 
 				<collection href="#{request.base_url}/atompub/posts">
 					<atom:title>Posts</atom:title>
@@ -132,7 +136,7 @@ get "/atompub/posts" do
 
 	builder = Nokogiri::XML::Builder.new(encoding: "UTF-8") do |xml|
 		xml.feed("xmlns" => "http://www.w3.org/2005/Atom") do
-			xml.title "Blogulator! Demo"
+			xml.title "#{blogulator_config["blog_title"] || "No title in blogulator.yml."}"
 			xml.id "#{request.base_url}/atompub/posts"
 
 			xml.updated(

@@ -2,3 +2,5 @@ blog_title: "Blogulator! Demo"
 blog_options:
    layout: "blog"
    author: "Blogulator Author"
+username: "admin"
+password: "changeme"

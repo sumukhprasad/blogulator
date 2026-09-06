@@ -65,6 +65,29 @@ def request_filename
 	match && match[1]
 end
 
+def authenticated?
+	blogulator_config = YAML.load_file('blogulator.yml')
+	auth = request.env["HTTP_AUTHORIZATION"]
+	return false unless auth
+
+	scheme, encoded = auth.split(" ", 2)
+	return false unless scheme&.downcase == "basic" && encoded
+
+	username, password = Base64.strict_decode64(encoded).split(":", 2)
+
+	username == blogulator_config["username"] &&
+	password == blogulator_config["password"]
+rescue ArgumentError
+	false
+end
+
+def require_auth!
+	return if authenticated?
+
+	headers "WWW-Authenticate" => 'Basic realm="Blogulator"'
+	halt 401, "authentication required\n"
+end
+
 
 
 
@@ -290,6 +313,9 @@ end
 
 # catch-all logger
 before do
+	if %w[POST PUT PATCH DELETE].include?(request.request_method)
+		require_auth!
+	end
 end
 
 %w[get post put patch delete options head].each do |method|

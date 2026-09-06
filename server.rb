@@ -1,5 +1,6 @@
 require "sinatra"
 require "time"
+require "bcrypt"
 require 'securerandom'
 require 'yaml'
 require_relative "process_xml"
@@ -9,12 +10,12 @@ require_relative "storage"
 require_relative "utils"
 
 
-blogulator_storage = Storage.new(".", "assets", "posts")
+blogulator_config = YAML.load_file('blogulator.yml')
+
+
+blogulator_storage = Storage.new(".", blogulator_config["media_path"], blogulator_config["posts_path"])
 set :bind, "0.0.0.0"
 set :port, 4567
-
-
-blogulator_config = YAML.load_file('blogulator.yml')
 
 # logging
 def dump_request
@@ -76,7 +77,7 @@ def authenticated?
 	username, password = Base64.strict_decode64(encoded).split(":", 2)
 
 	username == blogulator_config["username"] &&
-	password == blogulator_config["password"]
+	BCrypt::Password.new(blogulator_config["password_hash"]) == password
 rescue ArgumentError
 	false
 end

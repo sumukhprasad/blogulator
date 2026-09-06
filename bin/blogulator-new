@@ -1,0 +1,44 @@
+#! /usr/bin/env ruby
+
+require "yaml"
+require "bcrypt"
+
+config = {
+  "blog_options" => {}
+}
+
+puts "Creating a new Blogulator configuration here (#{Dir.getwd})..."
+puts "Please answer the following questions:"
+puts
+
+print ">> What is the name of your blog? "
+config["blog"] = gets&.chomp
+
+print ">> Where do I store content? "
+config["posts_path"] = gets&.chomp
+
+print ">> Where do I store media? "
+config["media_path"] = gets&.chomp
+
+print ">> What is the default layout of a blog post? "
+config["blog_options"]["layout"] = gets&.chomp
+
+print ">> What is the author's name? "
+config["blog_options"]["author"] = gets&.chomp
+
+print ">> Please provide a username: "
+config["username"] = gets&.chomp
+
+print ">> Please provide a password: "
+password = gets&.chomp
+
+config["password_hash"] = BCrypt::Password.create(password).to_s
+
+config_path = File.join(Dir.getwd, "blogulator.yml")
+
+File.write(config_path, config.to_yaml)
+
+File.chmod(0o600, config_path)
+
+puts
+puts "Configuration written to #{config_path}"

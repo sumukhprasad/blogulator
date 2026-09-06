@@ -1,0 +1,13 @@
+#! /usr/bin/env ruby
+
+require "yaml"
+
+puts "Starting Blogulator..."
+
+if !File.file?(Dir.getwd+"/blogulator.yml")
+	abort("Oh no! Cannot find blogulator.yml. Run `blogulator-new` to create it.")
+end
+
+
+require_relative "../server"
+Sinatra::Application.run!

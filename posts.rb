@@ -41,14 +41,31 @@ class Post
 	end
 	
 	
-	# TODO: add metadata support, add updated_at key
-	def to_file
+	def to_file(blog_options = {})
+		front_matter = {
+			"title" => @title,
+			"date" => @date,
+			"slug" => @slug,
+			"created_at" => @created_at,
+			"updated_at" => @updated_at
+		}.compact
+
+		front_matter["author"] = blog_options["author"] if blog_options["author"]
+		front_matter["layout"] = blog_options["page_layout"] if blog_options["page_layout"]
+
+		blog_options.each do |key, value|
+			front_matter[key.to_s] = value
+		end
+
+		metadata.each do |key, value|
+			front_matter[key.to_s] = value
+		end
+
 		<<~MD
 			---
-			title: "#{title}"
-			date: #{date.iso8601}
+			#{front_matter.to_yaml.sub(/\A---\s*\n/, "").chomp}
 			---
-						
+
 			#{body}
 		MD
 	end

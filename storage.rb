@@ -20,32 +20,32 @@ class Storage
 		
 		FileUtils.mkdir_p(@posts)
 		FileUtils.mkdir_p(@assets)
+		
+		config = YAML.load_file("blogulator.yml")
+		@blog_options = config["blog_options"] || {}
 	end
 	
 	
 	
 	
 	
-	
-	
-	
-	
-	
-	
-	
-	# Posts
 	def create_post(post)
 		puts "Creating post #{post.id}..."
-		
+
 		directory = @posts.join(post.filepath)
 		FileUtils.mkdir_p(directory)
-		
-		
+
 		post.slug = Utils.unique_slug(directory, post.slug)
 		filepath = directory.join(post.slug + ".md")
-		
-		File.write(filepath, post.to_file)
-		
+
+		post.created_at ||= Time.now
+		post.updated_at ||= post.created_at
+
+		File.write(
+			filepath,
+			post.to_file(@blog_options)
+		)
+
 		@db.execute(
 			<<~SQL,
 				INSERT INTO posts (
@@ -56,45 +56,55 @@ class Storage
 				)
 				VALUES (?, ?, ?, ?)
 			SQL
-			[post.id,
-			post.slug,
-			post.date.iso8601,
-			post.date.iso8601]
+			[
+				post.id,
+				post.slug,
+				post.created_at.iso8601,
+				post.updated_at.iso8601
+			]
 		)
-		
-		post.created_at = post.date
-		post.updated_at = post.date
-		
+
 		puts "Done!"
-		
+
 		post
 	end
-	
+
 	def update_post(id, updated_post)
 		puts "Updating post #{id}..."
 
 		post = get_post(id)
 		return nil unless post
-		
-		puts updated_post.inspect
 
-		post.title = updated_post.title if updated_post.title
-		post.body = updated_post.body if updated_post.body
-		post.updated_at = updated_post.created_at || Time.now
+		post.title = updated_post.title unless updated_post.title.nil?
+		post.body = updated_post.body unless updated_post.body.nil?
+		post.updated_at = updated_post.updated_at unless updated_post.updated_at.nil?
+		post.slug = updated_post.slug unless updated_post.slug.nil?
+
+		post.metadata = post.metadata.merge(updated_post.metadata || {})
+
+		post.updated_at = updated_post.updated_at || Time.now
 
 		directory = @posts.join(post.filepath)
-		filepath = directory.join(post.slug + ".md")
+		FileUtils.mkdir_p(directory)
 
-		File.write(filepath, post.to_file)
+		filepath = directory.join(post.slug + ".md")
+		
+		File.write(
+			filepath,
+			post.to_file(@blog_options)
+		)
 
 		@db.execute(
 			<<~SQL,
 				UPDATE posts
-				SET updated_at = ?
+				SET slug = ?, updated_at = ?
 				WHERE id = ?
 			SQL
-			[post.updated_at.iso8601,
-			id]
+			[
+				post.slug,
+				post.updated_at.iso8601,
+				id
+			]
 		)
 
 		puts "Done!"
@@ -110,10 +120,10 @@ class Storage
 
 		return nil unless post_record
 
-		post_id = post_record[0]
-		slug = post_record[1]
-		created_at = Time.parse(post_record[2])
-		updated_at = Time.parse(post_record[3])
+		post_id, slug, created_at_string, updated_at_string = post_record
+
+		created_at = Time.parse(created_at_string)
+		updated_at = Time.parse(updated_at_string)
 
 		path = @posts
 			.join(created_at.strftime("%Y"))
@@ -131,7 +141,24 @@ class Storage
 
 		_, front_matter, body = content.split(/^---\s*$\n/, 3)
 
-		metadata = YAML.safe_load(front_matter, permitted_classes: [Time]) || {}
+		unless front_matter && body
+			raise "Post #{id} has invalid Jekyll front matter"
+		end
+
+		metadata = YAML.safe_load(
+			front_matter,
+			permitted_classes: [Time, Date]
+		) || {}
+		
+		
+		metadata = metadata.except(
+		  "id",
+		  "body",
+		  "slug",
+		  "created_at",
+		  "updated_at",
+		  "path"
+		)
 
 		Post.new(
 			id: post_id,
@@ -147,11 +174,8 @@ class Storage
 	end
 	
 	def get_posts(options = {})
-		limit = options.fetch(:limit, 20)
-		offset = options.fetch(:offset, 0)
-
-		limit = Integer(limit)
-		offset = Integer(offset)
+		limit = Integer(options.fetch(:limit, 20))
+		offset = Integer(options.fetch(:offset, 0))
 
 		rows = @db.execute(
 			<<~SQL,
@@ -160,8 +184,10 @@ class Storage
 				ORDER BY created_at DESC
 				LIMIT ? OFFSET ?
 			SQL
-			[limit,
-			offset]
+			[
+				limit,
+				offset
+			]
 		)
 
 		rows.filter_map do |row|
@@ -176,7 +202,10 @@ class Storage
 				.join(created_at.strftime("%d"))
 				.join("#{slug}.md")
 
-			next unless File.file?(path)
+			unless File.file?(path)
+				warn "Skipping post #{id}: file not found at #{path}"
+				next
+			end
 
 			content = File.read(path)
 
@@ -187,10 +216,24 @@ class Storage
 
 			_, front_matter, body = content.split(/^---\s*$\n/, 3)
 
+			unless front_matter && body
+				warn "Skipping post #{id}: invalid Jekyll front matter"
+				next
+			end
+
 			metadata = YAML.safe_load(
 				front_matter,
-				permitted_classes: [Time]
+				permitted_classes: [Time, Date]
 			) || {}
+			
+			metadata = metadata.except(
+			  "id",
+			  "body",
+			  "slug",
+			  "created_at",
+			  "updated_at",
+			  "path"
+			)
 
 			Post.new(
 				id: id,
@@ -200,11 +243,12 @@ class Storage
 				date: metadata["date"],
 				created_at: created_at,
 				updated_at: updated_at,
-				path: path
+				path: path,
+				metadata: metadata
 			)
 		end
 	end
-	
+
 	def delete_post(id)
 		puts "Deleting post #{id}..."
 
@@ -214,14 +258,14 @@ class Storage
 		if File.file?(post.path)
 			File.delete(post.path)
 		end
-          
+
 		@db.execute(
 			"DELETE FROM posts WHERE id = ?",
 			[id]
 		)
-          
+
 		puts "Done!"
-          
+
 		true
 	end
 	
@@ -243,113 +287,115 @@ class Storage
 	
 	# Media
 	def create_media(filename:, content_type:, data:)
-	    id = SecureRandom.uuid
-	    now = Time.now
+		id = SecureRandom.uuid
+		now = Time.now
 
-	    original_filename = filename
-	    filename = Utils.sanitize_filename(filename)
+		original_filename = filename
+		filename = Utils.sanitize_filename(filename)
 
-	    directory = @assets
+		directory = @assets
 				.join(now.strftime("%Y"))
 				.join(now.strftime("%m"))
 				.join(now.strftime("%d"))
 
 		FileUtils.mkdir_p(directory)
 
-	    path = directory.join(filename)
+		path = directory.join(filename)
 
-	    File.binwrite(path, data)
+		File.binwrite(path, data)
 
-	    @db.execute(
-	        <<~SQL,
-	            INSERT INTO media (
-	                id,
-	                filename,
-	                original_filename,
-	                content_type,
-	                size,
-	                created_at,
-	                updated_at
-	            )
-	            VALUES (?, ?, ?, ?, ?, ?, ?)
-	        SQL
-	        [
-	            id,
-	            original_filename,
-	            filename,
-	            content_type,
-	            data.bytesize,
-	            now.iso8601,
-	            now.iso8601
-	        ]
-	    )
+		@db.execute(
+			<<~SQL,
+				INSERT INTO media (
+					id,
+					filename,
+					original_filename,
+					content_type,
+					size,
+					created_at,
+					updated_at
+				)
+				VALUES (?, ?, ?, ?, ?, ?, ?)
+			SQL
+			[
+				id,
+				filename,
+				original_filename,
+				content_type,
+				data.bytesize,
+				now.iso8601,
+				now.iso8601
+			]
+		)
 
-	    Media.new(
-	        id: id,
-	        filename: filename,
-	        original_filename: filename,
-	        content_type: content_type,
-	        size: data.bytesize,
-	        created_at: now,
-	        updated_at: now,
-	        path: path
-	    )
+		Media.new(
+			id: id,
+			filename: filename,
+			original_filename: filename,
+			content_type: content_type,
+			size: data.bytesize,
+			created_at: now,
+			updated_at: now,
+			path: path
+		)
 	end
 	
 	def get_media(id)
-	    row = @db.get_first_row(
-	        <<~SQL,
-	            SELECT
-	                id,
-	                filename,
-	                original_filename,
-	                content_type,
-	                size,
-	                created_at,
-	                updated_at
-	            FROM media
-	            WHERE id = ?
-	        SQL
-	        [id]
-	    )
+		row = @db.get_first_row(
+			<<~SQL,
+				SELECT
+					id,
+					filename,
+					original_filename,
+					content_type,
+					size,
+					created_at,
+					updated_at
+				FROM media
+				WHERE id = ?
+			SQL
+			[id]
+		)
 
-	    return nil unless row
+		return nil unless row
 
-	    id,
-	    filename,
-	    original_filename,
-	    content_type,
-	    size,
-	    created_at,
-	    updated_at = row
+		id,
+		filename,
+		original_filename,
+		content_type,
+		size,
+		created_at,
+		updated_at = row
 
-	    created_at = Time.parse(created_at)
+		created_at = Time.parse(created_at)
 
-	    path = @assets
+		path = @assets
 				.join(created_at.strftime("%Y"))
 				.join(created_at.strftime("%m"))
 				.join(created_at.strftime("%d"))
 				.join(filename)
+				
+		puts path
 
-	    return nil unless File.file?(path)
+		return nil unless File.file?(path)
 
-	    Media.new(
-	        id: id,
-	        filename: filename,
-	        original_filename: original_filename,
-	        content_type: content_type,
-	        size: size,
-	        created_at: created_at,
-	        updated_at: created_at,
-	        path: path
-	    )
+		Media.new(
+			id: id,
+			filename: filename,
+			original_filename: original_filename,
+			content_type: content_type,
+			size: size,
+			created_at: created_at,
+			updated_at: created_at,
+			path: path
+		)
 	end
 	
 	def get_media_content(id)
-	    media = get_media(id)
-	    return nil unless media
+		media = get_media(id)
+		return nil unless media
 
-	    File.binread(media.path)
+		File.binread(media.path)
 	end
 
 	
@@ -385,13 +431,13 @@ class Storage
 			puts "Table does not exist. Creating..."
 			@db.execute <<-SQL
 			CREATE TABLE IF NOT EXISTS media (
-			    id TEXT PRIMARY KEY,
-			    filename TEXT NOT NULL,
-			    original_filename TEXT,
-			    content_type TEXT NOT NULL,
-			    size INTEGER NOT NULL,
-			    created_at TEXT NOT NULL,
-			    updated_at TEXT NOT NULL
+				id TEXT PRIMARY KEY,
+				filename TEXT NOT NULL,
+				original_filename TEXT,
+				content_type TEXT NOT NULL,
+				size INTEGER NOT NULL,
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
 			);
 			SQL
 			puts "Table created!"

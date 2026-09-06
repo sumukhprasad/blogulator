@@ -30,24 +30,33 @@ def post_from_atom(xml)
 		ns
 	)&.text
 
+	metadata = {
+		"summary" => summary,
+		"categories" => categories,
+		"draft" => draft
+	}
+
+	metadata.delete("summary") if summary.empty?
+	metadata.delete("categories") if categories.empty?
+	metadata.delete("draft") if draft.nil?
+
 	Post.new(
 		id: nil,
 		title: title,
 		body: body,
 		slug: nil,
 		date: date,
-		created_at: date,
-		updated_at: nil,
+		created_at: Time.now,
+		updated_at: Time.now,
 		path: nil,
-		metadata: {
-			summary: summary,
-			categories: categories,
-			draft: draft
-		}
+		metadata: metadata
 	)
 end
 
+
 def post_to_atom(post, request)
+	metadata = (post.metadata || {}).transform_keys(&:to_s)
+
 	builder = Nokogiri::XML::Builder.new(encoding: "UTF-8") do |xml|
 		xml.entry(
 			"xmlns" => "http://www.w3.org/2005/Atom"
@@ -61,23 +70,27 @@ def post_to_atom(post, request)
 				Time.now.utc.iso8601
 			)
 
-			if post.created_at
+			if post.date
+				xml.published post.date.utc.iso8601
+			elsif post.created_at
 				xml.published post.created_at.utc.iso8601
 			end
 
-			if post.metadata&.dig(:summary).to_s != ""
-				xml.summary post.metadata[:summary]
+			summary = metadata["summary"]
+
+			if summary && !summary.empty?
+				xml.summary summary
 			end
 
-			post.metadata&.dig(:categories)&.each do |category|
+			Array(metadata["categories"]).each do |category|
 				xml.category "term" => category
 			end
 
-			if post.metadata&.key?(:draft)
+			if metadata.key?("draft")
 				xml.control(
 					"xmlns" => "http://www.w3.org/2007/app"
 				) do
-					xml.draft post.metadata[:draft]
+					xml.draft metadata["draft"].to_s
 				end
 			end
 
@@ -95,6 +108,7 @@ def post_to_atom(post, request)
 
 	builder.to_xml
 end
+
 
 
 

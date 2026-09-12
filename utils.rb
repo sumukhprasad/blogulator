@@ -26,6 +26,22 @@ module Utils
 	  		name.gsub!(/[^0-9A-Za-z.\-]/, '_')
 	  	end
 	end
+	
+	
+	def self.get_unique_filename(directory, filename)
+		extension = File.extname(filename)
+		basename = File.basename(filename, extension)
+         	
+		filename_new = filename
+		counter = 2
+         	
+		while File.exist?(directory.join(filename_new))
+			filename_new = "#{basename}-#{counter}#{extension}"
+			counter += 1
+		end
+         	
+		filename_new
+	end
 end
 
 

@@ -14,8 +14,14 @@ puts
 print ">> What is the name of your blog? "
 config["blog"] = gets&.chomp
 
+print ">> What should I name the configuration file (???-blogulator.yml)? "
+configname = gets&.chomp
+
 print ">> What is the base URL for your blog? "
-config["blog_options"]["baseurl"] = gets&.chomp
+config["blog_baseurl"] = gets&.chomp
+
+print ">> What port should Blogulator use for the endpoint? "
+config["port"] = gets&.chomp
 
 print ">> Where do I store content? "
 config["posts_path"] = gets&.chomp
@@ -37,7 +43,7 @@ password = gets&.chomp
 
 config["password_hash"] = BCrypt::Password.create(password).to_s
 
-config_path = File.join(Dir.getwd, "blogulator.yml")
+config_path = File.join(Dir.getwd, "#{configname}-blogulator.yml")
 
 File.write(config_path, config.to_yaml)
 

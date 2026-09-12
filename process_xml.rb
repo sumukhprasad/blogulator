@@ -113,11 +113,11 @@ end
 
 
 def media_to_atom(media, request)
-	blogulator_config = YAML.load_file('blogulator.yml')
+	blogulator_config = YAML.load_file($blog_name+'-blogulator.yml')
 	
 	media_url = "#{request.base_url}/atompub/media/#{media.id}"
 	edit_url = media_url
-	public_url = "#{blogulator_config["blog_options"]["baseurl"]}/#{media.path}"
+	public_url = "#{blogulator_config["blog_baseurl"]}/#{media.path}"
 
 	Nokogiri::XML::Builder.new(
 		encoding: "UTF-8"

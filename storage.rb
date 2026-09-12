@@ -21,7 +21,7 @@ class Storage
 		FileUtils.mkdir_p(@posts)
 		FileUtils.mkdir_p(@assets)
 		
-		config = YAML.load_file("blogulator.yml")
+		config = YAML.load_file($blog_name+"-blogulator.yml")
 		@blog_options = config["blog_options"] || {}
 	end
 	
@@ -300,7 +300,7 @@ class Storage
 
 		FileUtils.mkdir_p(directory)
 
-		path = directory.join(filename)
+		path = directory.join(Utils.get_unique_filename(directory, filename))
 
 		File.binwrite(path, data)
 

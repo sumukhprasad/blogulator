@@ -1,13 +1,31 @@
 #! /usr/bin/env ruby
 
 require "yaml"
+require "sinatra"
+
 
 puts "Starting Blogulator..."
 
-if !File.file?(Dir.getwd+"/blogulator.yml")
-	abort("Oh no! Cannot find blogulator.yml. Run `blogulator-new` to create it.")
+name = ARGV[0]
+
+if name.nil? || name.empty?
+	abort("Oh no! Please provide a blog name. Usage: blogulator <name>")
 end
 
+config_file = File.join(Dir.getwd, "#{name}-blogulator.yml")
 
+unless File.file?(config_file)
+	abort("Oh no! Cannot find #{name}-blogulator.yml. Run `blogulator-new #{name}` to create it.")
+end
+
+config = YAML.load_file(config_file)
+
+port = config["port"]
+
+if port.nil?
+	abort("Oh no! #{config_file} does not contain a `port` field.")
+end
+
+$blog_name = ARGV[0]
 require_relative "../server"
-Sinatra::Application.run!
+Sinatra::Application.run!(port: port)

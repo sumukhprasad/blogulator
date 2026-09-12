@@ -10,12 +10,11 @@ require_relative "storage"
 require_relative "utils"
 
 
-blogulator_config = YAML.load_file('blogulator.yml')
+blogulator_config = YAML.load_file($blog_name+'-blogulator.yml')
 
 
 blogulator_storage = Storage.new(".", blogulator_config["media_path"], blogulator_config["posts_path"])
 set :bind, "0.0.0.0"
-set :port, 4567
 
 # logging
 def dump_request
@@ -67,7 +66,7 @@ def request_filename
 end
 
 def authenticated?
-	blogulator_config = YAML.load_file('blogulator.yml')
+	blogulator_config = YAML.load_file($blog_name+'-blogulator.yml')
 	auth = request.env["HTTP_AUTHORIZATION"]
 	return false unless auth
 

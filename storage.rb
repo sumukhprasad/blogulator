@@ -374,8 +374,6 @@ class Storage
 				.join(created_at.strftime("%m"))
 				.join(created_at.strftime("%d"))
 				.join(filename)
-				
-		puts path
 
 		return nil unless File.file?(path)
 

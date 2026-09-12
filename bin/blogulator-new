@@ -14,6 +14,9 @@ puts
 print ">> What is the name of your blog? "
 config["blog"] = gets&.chomp
 
+print ">> What is the base URL for your blog? "
+config["blog_options"]["baseurl"] = gets&.chomp
+
 print ">> Where do I store content? "
 config["posts_path"] = gets&.chomp
 

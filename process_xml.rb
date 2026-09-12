@@ -1,5 +1,7 @@
 require "nokogiri"
 require "time"
+require 'yaml'
+
 
 def post_from_atom(xml)
 	doc = Nokogiri::XML(xml) do |config|
@@ -110,12 +112,12 @@ def post_to_atom(post, request)
 end
 
 
-
-
 def media_to_atom(media, request)
+	blogulator_config = YAML.load_file('blogulator.yml')
+	
 	media_url = "#{request.base_url}/atompub/media/#{media.id}"
 	edit_url = media_url
-	public_url = "#{request.base_url}/assets/#{media.filename}"
+	public_url = "#{blogulator_config["blog_options"]["baseurl"]}/#{media.path}"
 
 	Nokogiri::XML::Builder.new(
 		encoding: "UTF-8"
@@ -127,7 +129,6 @@ def media_to_atom(media, request)
 			xml.id media_url
 			xml.title media.filename
 			xml.updated media.updated_at.utc.iso8601
-
 			xml.published media.created_at.utc.iso8601
 
 			xml.link(
@@ -143,12 +144,13 @@ def media_to_atom(media, request)
 
 			xml.link(
 				"rel" => "alternate",
-				"href" => public_url
+				"href" => public_url,
+				"type" => media.content_type
 			)
 
 			xml.content(
 				"type" => media.content_type,
-				"src" => media_url
+				"src" => public_url
 			)
 		end
 	end.to_xml

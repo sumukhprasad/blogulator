@@ -15,7 +15,7 @@ class Storage
 		@posts = @root.join(posts_path)
 		@assets = @root.join(assets_path)
 		
-		@db = SQLite3::Database.new @root.join("blogulator.db").to_s
+		@db = SQLite3::Database.new @root.join($blog_name+"-blogulator.db").to_s
 		create_db_if_not_available
 		
 		FileUtils.mkdir_p(@posts)

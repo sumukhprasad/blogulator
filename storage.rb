@@ -34,7 +34,12 @@ class Storage
 
 		directory = @posts.join(post.filepath)
 		FileUtils.mkdir_p(directory)
-
+		
+		if post.slug == ""
+			micropost_title = post.body.split.first(5).join(" ")
+			post.slug = Utils.slugify(micropost_title)
+		end
+		
 		post.slug = Utils.unique_slug(directory, post.slug)
 		filepath = directory.join(post.slug + ".md")
 
@@ -75,10 +80,12 @@ class Storage
 		post = get_post(id)
 		return nil unless post
 
-		post.title = updated_post.title unless updated_post.title.nil?
+		unless updated_post.title.nil?
+			post.title = updated_post.title
+			post.metadata["title"] = updated_post.title
+		end
 		post.body = updated_post.body unless updated_post.body.nil?
 		post.updated_at = updated_post.updated_at unless updated_post.updated_at.nil?
-		post.slug = updated_post.slug unless updated_post.slug.nil?
 
 		post.metadata = post.metadata.merge(updated_post.metadata || {})
 
